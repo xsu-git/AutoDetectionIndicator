@@ -3,10 +3,5 @@
 '''
 @Time              @Author    @Version    @Desciption
 ---------------    -------    --------    -----------
-2025/9/2 13:29     Xsu         1.0         None
+2025/9/2 14:59     Xsu         1.0         None
 '''
-from .logger_util import BotsLogger
-
-logBot = BotsLogger("AutoDetection").init()
-
-__all__ = [logBot]

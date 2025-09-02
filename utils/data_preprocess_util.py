@@ -25,3 +25,4 @@ def feather_to_csv(feather_file:str):
 
 if __name__ == '__main__':
     feather_to_csv("BTC_USDT_USDT-5m-futures.feather")
+    # load_process_data("BTC_USDT_USDT-5m-futures.csv")
