@@ -55,6 +55,9 @@ def restore_hook(d: dict):
 def build_data_dir():
     return Path(__file__).parent.parent.absolute() / "data"
 
+def build_feature_dir():
+    return Path(__file__).parent.parent.absolute() / "features"
+
 
 if __name__ == '__main__':
     feather_to_csv("BTC_USDT_USDT-5m-futures.feather")

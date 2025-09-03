@@ -23,7 +23,6 @@ from utils import logBot
 from tqdm import tqdm
 
 import warnings
-from numba import jit
 warnings.filterwarnings('ignore')
 
 
@@ -80,6 +79,9 @@ class PeakFeatureEngineer:
         # 1. 峰值结构特征
         logBot.info("Start extract peak structure features")
         peak_structure_features = self._extract_peak_structure_features(df_tech, peaks_results)
+
+
+
         features_df = pd.concat([features_df, peak_structure_features], axis=1)
 
         # 2. 价格动量特征
