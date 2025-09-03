@@ -6,17 +6,16 @@
 2025/9/2 15:20     Xsu         1.0         None
 '''
 import os
-from pathlib import Path
 import pandas as pd
 from utils import logBot
+from utils.data_preprocess_util import build_data_dir
 
 def load_process_data(csv_file:str):
     '''
     :param csv_file:  .csv type file path to load
     :return:
     '''
-    data_dir = Path(__file__).parent.parent.absolute() / "data"
-    process_data_path = data_dir / csv_file
+    process_data_path = build_data_dir() / csv_file
     if not os.path.exists(process_data_path):
         logBot.critical("Load data failed: file not exist")
         return
@@ -58,5 +57,6 @@ def load_process_data(csv_file:str):
     logBot.info(f"Load data shape: {df_processed.shape}")
     logBot.info(f"Load data Time Range:  {df_processed.index[0]} to {df_processed.index[-1]}")
     logBot.info(f"Load data Price Range:  {df_processed['close'].min():.2f} - {df_processed['close'].max():.2f}")
+    logBot.info(f"Load data Finish")
     return df_processed
 

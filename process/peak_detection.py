@@ -11,13 +11,16 @@ import numpy as np
 from scipy.signal import find_peaks, argrelextrema
 from scipy.ndimage import gaussian_filter1d
 import talib
-from typing import Tuple, Dict, List
+from typing import Dict, List
 import warnings
 from utils import logBot
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pathlib import Path
 import time,json
+from process.loader import load_process_data
+from utils.data_preprocess_util import to_jsonable,build_data_dir
+
 
 warnings.filterwarnings('ignore')
 
@@ -479,9 +482,17 @@ class PeakDetector:
         plt.tight_layout()
         plt.show()
 
-    def _peak_reserve(self,content:dict):
-        data_dir = Path(__file__).parent.parent.absolute() / "data"
-        output_path = data_dir / f"peak_report_{str(int(time.time()))}.json"
+    def _peak_reserve(self, content:dict):
+        output_path = build_data_dir() / f"peak_report_{str(int(time.time()))}.json"
         with output_path.open("w", encoding="utf-8") as f:
-            json.dump(content, f, ensure_ascii=False, indent=2)
+            f.write(json.dumps(content, ensure_ascii=False, indent=2,default=to_jsonable, allow_nan=False))
 
+if __name__ == '__main__':
+    df = load_process_data("BTC_USDT_USDT-5m-futures.csv")
+    detector = PeakDetector(
+        atr_period=14,  # ATR周期
+        volatility_window=20,  # 波动率窗口
+        min_peak_distance=6,  # 最小峰值间距
+        smoothing_sigma=1.0  # 高斯平滑参数
+    )
+    detector.detect_peaks_advanced(df)
