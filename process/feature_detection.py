@@ -23,7 +23,7 @@ from utils import logBot
 from tqdm import tqdm
 
 import warnings
-
+from numba import jit
 warnings.filterwarnings('ignore')
 
 
@@ -83,7 +83,7 @@ class PeakFeatureEngineer:
         features_df = pd.concat([features_df, peak_structure_features], axis=1)
 
         # 2. 价格动量特征
-        logBot.info("Start extract Price Momentum Features")
+        logBot.info("Start extract Price Momentum features")
         momentum_features = self._extract_momentum_features(df_tech)
         features_df = pd.concat([features_df, momentum_features], axis=1)
 
@@ -93,10 +93,12 @@ class PeakFeatureEngineer:
         features_df = pd.concat([features_df, volatility_features], axis=1)
 
         # 4. 成交量特征
+        logBot.info("Start extract volume structure features")
         volume_features = self._extract_volume_features(df_tech)
         features_df = pd.concat([features_df, volume_features], axis=1)
 
         # 5. 技术指标特征
+        logBot.info("Start extract technical structure features")
         technical_features = self._extract_technical_features(df_tech)
         features_df = pd.concat([features_df, technical_features], axis=1)
 
@@ -239,6 +241,21 @@ class PeakFeatureEngineer:
 
         return features
 
+    def _calculate_vpt_optimized(self, close, volume):
+        """
+        VPT计算的优化版本 - 使用pandas内置函数
+        """
+        # 计算价格变化率
+        price_pct_change = close.pct_change()
+
+        # 计算VPT增量
+        vpt_increments = volume * price_pct_change
+
+        # 累积求和，第一个值为0
+        vpt = vpt_increments.fillna(0).cumsum()
+
+        return vpt
+
     def _extract_volume_features(self, df_tech: pd.DataFrame) -> pd.DataFrame:
         """提取成交量特征"""
         features = pd.DataFrame(index=df_tech.index)
@@ -249,7 +266,8 @@ class PeakFeatureEngineer:
             features[f'vol_ratio_{period}'] = df_tech['volume'] / features[f'vol_sma_{period}']
 
         # 成交量价格趋势
-        features['vpt'] = talib.VPT(df_tech['close'], df_tech['volume'])
+        # features['vpt'] = talib.VPT(df_tech['close'], df_tech['volume'])
+        features['vpt'] = self._calculate_vpt_optimized(df_tech['close'], df_tech['volume'])
         features['obv'] = talib.OBV(df_tech['close'], df_tech['volume'])
 
         # 资金流指标
@@ -436,17 +454,92 @@ class PeakFeatureEngineer:
         return pd.Series(result, index=idx, dtype=float)
 
 
+    # def _calculate_peak_trend(self, df_tech, window):
+    #     """计算峰值趋势"""
+    #     peak_prices = df_tech['close'].where(df_tech['is_peak'] == 1)
+    #     return peak_prices.rolling(window=window, min_periods=2).apply(
+    #         lambda x: np.polyfit(range(len(x.dropna())), x.dropna(), 1)[0] if len(x.dropna()) >= 2 else np.nan
+    #     )
+
     def _calculate_peak_trend(self, df_tech, window):
-        """计算峰值趋势"""
-        peak_prices = df_tech['close'].where(df_tech['is_peak'] == 1)
-        return peak_prices.rolling(window=window, min_periods=2).apply(
-            lambda x: np.polyfit(range(len(x.dropna())), x.dropna(), 1)[0] if len(x.dropna()) >= 2 else np.nan
-        )
+        """
+        纯向量化版本（适合峰值密集的场景）
+        通过预处理峰值序列，减少NaN处理开销
+        """
+        idx = df_tech.index
+
+        # 1. 提取所有峰值及其位置
+        peak_mask = df_tech['is_peak'] == 1
+        peak_positions = np.where(peak_mask)[0]
+        peak_values = df_tech.loc[peak_mask, 'close'].values
+
+        if len(peak_values) < 2:
+            return pd.Series(np.nan, index=idx, dtype=float)
+
+        # 2. 为每个峰值计算趋势（向前看window个峰值）
+        result = np.full(len(df_tech), np.nan, dtype=float)
+
+        for i in range(len(peak_positions)):
+            current_pos = peak_positions[i]
+
+            # 获取当前及之前的峰值（最多window个）
+            end_idx = i + 1
+            start_idx = max(0, end_idx - window)
+
+            if end_idx - start_idx >= 2:  # 至少需要2个峰值
+                # 提取相关峰值
+                relevant_positions = peak_positions[start_idx:end_idx]
+                relevant_values = peak_values[start_idx:end_idx]
+
+                # 计算斜率
+                x = np.arange(len(relevant_values))
+                slope = np.polyfit(x, relevant_values, 1)[0]
+
+                # 将结果赋给当前峰值位置
+                result[current_pos] = slope
+
+        # 3. 向前填充到所有位置（可选，根据需求决定）
+        result_series = pd.Series(result, index=idx)
+        # result_series = result_series.fillna(method='ffill')  # 如果需要填充
+
+        return result_series
+
+
+    # def _calculate_momentum_divergence(self, df_tech, period):
+    #     """计算动量背离"""
+    #     price_trend = df_tech['close'].rolling(period).apply(lambda x: stats.linregress(range(len(x)), x)[0])
+    #     rsi_trend = df_tech['rsi_14'].rolling(period).apply(lambda x: stats.linregress(range(len(x)), x)[0])
+    #
+    #     # 背离信号：价格和RSI趋势方向相反
+    #     return np.where((price_trend > 0) & (rsi_trend < 0), 1,  # 看跌背离
+    #                     np.where((price_trend < 0) & (rsi_trend > 0), -1, 0))  # 看涨背离
 
     def _calculate_momentum_divergence(self, df_tech, period):
-        """计算动量背离"""
-        price_trend = df_tech['close'].rolling(period).apply(lambda x: stats.linregress(range(len(x)), x)[0])
-        rsi_trend = df_tech['rsi_14'].rolling(period).apply(lambda x: stats.linregress(range(len(x)), x)[0])
+        """
+        使用Pandas优化的版本（中等性能，代码简洁）
+        """
+
+        # 使用自定义的快速线性回归函数
+        def fast_linregress(x):
+            """快速线性回归，只返回斜率"""
+            if len(x) < 2:
+                return np.nan
+            n = len(x)
+            x_coords = np.arange(n)
+            sum_x = np.sum(x_coords)
+            sum_y = np.sum(x)
+            sum_xy = np.sum(x_coords * x)
+            sum_x2 = np.sum(x_coords * x_coords)
+
+            denominator = n * sum_x2 - sum_x * sum_x
+            if abs(denominator) < 1e-12:
+                return np.nan
+
+            return (n * sum_xy - sum_x * sum_y) / denominator
+
+        # 计算趋势
+        price_trend = df_tech['close'].rolling(period).apply(fast_linregress, raw=True)
+        rsi_trend = df_tech['rsi_14'].rolling(period).apply(fast_linregress, raw=True)
 
         # 背离信号：价格和RSI趋势方向相反
         return np.where((price_trend > 0) & (rsi_trend < 0), 1,  # 看跌背离
