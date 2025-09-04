@@ -3,7 +3,7 @@
 '''
 @Time              @Author    @Version    @Desciption
 ---------------    -------    --------    -----------
-2025/9/3 15:54     Xsu         1.0         None
+2025/9/3 15:54     Xsu         1.0         峰值结构特征 (20维)
 '''
 from features.base import ExtractFeatureBase
 import pandas as pd

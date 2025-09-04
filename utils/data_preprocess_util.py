@@ -6,11 +6,11 @@
 2025/9/2 13:40     Xsu         1.0         Format different types of files in a unified format
 '''
 import polars as pl
-import os
 from pathlib import Path
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone
+import talib
 
 TS_KEYS = {"timestamp"}  # need restore collection
 
@@ -57,6 +57,37 @@ def build_data_dir():
 
 def build_feature_dir():
     return Path(__file__).parent.parent.absolute() / "features"
+
+def calculate_technical_base(df: pd.DataFrame) -> pd.DataFrame:
+    """计算基础技术指标"""
+    df_tech = df.copy()
+
+    # 基础价格指标
+    df_tech['hl2'] = (df_tech['high'] + df_tech['low']) / 2
+    df_tech['hlc3'] = (df_tech['high'] + df_tech['low'] + df_tech['close']) / 3
+    df_tech['ohlc4'] = (df_tech['open'] + df_tech['high'] + df_tech['low'] + df_tech['close']) / 4
+
+    # 移动均线族
+    for period in [5, 10, 20, 50]:
+        df_tech[f'sma_{period}'] = talib.SMA(df_tech['close'], timeperiod=period)
+        df_tech[f'ema_{period}'] = talib.EMA(df_tech['close'], timeperiod=period)
+
+    # 波动率指标
+    df_tech['atr_14'] = talib.ATR(df_tech['high'], df_tech['low'], df_tech['close'], timeperiod=14)
+    df_tech['atr_7'] = talib.ATR(df_tech['high'], df_tech['low'], df_tech['close'], timeperiod=7)
+
+    # 动量指标
+    df_tech['rsi_14'] = talib.RSI(df_tech['close'], timeperiod=14)
+    df_tech['rsi_7'] = talib.RSI(df_tech['close'], timeperiod=7)
+
+    # MACD
+    df_tech['macd'], df_tech['macd_signal'], df_tech['macd_hist'] = talib.MACD(df_tech['close'])
+
+    # 布林带
+    df_tech['bb_upper'], df_tech['bb_middle'], df_tech['bb_lower'] = talib.BBANDS(df_tech['close'])
+    df_tech['bb_width'] = (df_tech['bb_upper'] - df_tech['bb_lower']) / df_tech['bb_middle']
+    df_tech['bb_position'] = (df_tech['close'] - df_tech['bb_lower']) / (df_tech['bb_upper'] - df_tech['bb_lower'])
+    return df_tech
 
 
 if __name__ == '__main__':
