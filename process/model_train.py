@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 import numpy as np
+from utils import logBot
 
 class MachineLearnTrain:
 
@@ -294,48 +295,152 @@ class MachineLearnTrain:
 
         return importance_dict
 
-    def backtest_signals(self, signals_df: pd.DataFrame) -> dict:
-        """回测交易信号"""
-        print("📊 执行信号回测...")
+    # def backtest_signals(self, signals_df: pd.DataFrame) -> dict:
+    #     """回测交易信号"""
+    #     print("📊 执行信号回测...")
+    #
+    #     # 简单回测逻辑
+    #     results = {
+    #         'total_signals': 0,
+    #         'buy_signals': 0,
+    #         'sell_signals': 0,
+    #         'strong_signals': 0,
+    #         'win_rate': 0.0,
+    #         'avg_return_per_signal': 0.0
+    #     }
+    #
+    #     # 统计信号分布
+    #     results['total_signals'] = len(signals_df[signals_df['trading_signal'] != 'NO_SIGNAL'])
+    #     results['buy_signals'] = len(signals_df[signals_df['signal_direction'] == 1])
+    #     results['sell_signals'] = len(signals_df[signals_df['signal_direction'] == -1])
+    #     results['strong_signals'] = len(signals_df[signals_df['signal_strength'] >= 7])
+    #
+    #     # 计算信号准确率 (简化版)
+    #     if 'predicted_future_return_3' in signals_df.columns:
+    #         predicted_returns = signals_df['predicted_future_return_3'].fillna(0)
+    #         signal_directions = signals_df['signal_direction'].fillna(0)
+    #
+    #         # 计算方向准确率
+    #         correct_predictions = ((predicted_returns > 0) & (signal_directions > 0)) | \
+    #                               ((predicted_returns < 0) & (signal_directions < 0))
+    #
+    #         valid_predictions = signal_directions != 0
+    #         if valid_predictions.sum() > 0:
+    #             results['win_rate'] = correct_predictions[valid_predictions].mean()
+    #             results['avg_return_per_signal'] = abs(predicted_returns[valid_predictions]).mean()
+    #
+    #     print(f"📈 回测结果:")
+    #     print(f"  总信号数: {results['total_signals']}")
+    #     print(f"  买入信号: {results['buy_signals']}")
+    #     print(f"  卖出信号: {results['sell_signals']}")
+    #     print(f"  强信号数: {results['strong_signals']}")
+    #     print(f"  胜率: {results['win_rate']:.2%}")
+    #     print(f"  平均预期收益: {results['avg_return_per_signal']:.4%}")
+    #
+    #     return results
 
-        # 简单回测逻辑
+
+class ProfessionalBacktester:
+    def __init__(self, initial_capital=100000, commission=0.001):
+        self.initial_capital = initial_capital
+        self.commission = commission
+
+    def backtest(self, signals_df, price_df):
+        """专业级回测"""
         results = {
-            'total_signals': 0,
-            'buy_signals': 0,
-            'sell_signals': 0,
-            'strong_signals': 0,
-            'win_rate': 0.0,
-            'avg_return_per_signal': 0.0
+            'trades': [],
+            'equity_curve': [],
+            'positions': []
         }
 
-        # 统计信号分布
-        results['total_signals'] = len(signals_df[signals_df['trading_signal'] != 'NO_SIGNAL'])
-        results['buy_signals'] = len(signals_df[signals_df['signal_direction'] == 1])
-        results['sell_signals'] = len(signals_df[signals_df['signal_direction'] == -1])
-        results['strong_signals'] = len(signals_df[signals_df['signal_strength'] >= 7])
+        capital = self.initial_capital
+        position = 0
+        entry_price = 0
 
-        # 计算信号准确率 (简化版)
-        if 'predicted_future_return_3' in signals_df.columns:
-            predicted_returns = signals_df['predicted_future_return_3'].fillna(0)
-            signal_directions = signals_df['signal_direction'].fillna(0)
+        for idx, row in signals_df.iterrows():
+            current_price = price_df.loc[idx, 'close']
 
-            # 计算方向准确率
-            correct_predictions = ((predicted_returns > 0) & (signal_directions > 0)) | \
-                                  ((predicted_returns < 0) & (signal_directions < 0))
+            # 执行交易逻辑
+            if row['trading_signal'].startswith('STRONG_BUY') and position == 0:
+                # 开多仓
+                position_size = row['position_size'] * capital / current_price
+                commission_paid = position_size * current_price * self.commission
 
-            valid_predictions = signal_directions != 0
-            if valid_predictions.sum() > 0:
-                results['win_rate'] = correct_predictions[valid_predictions].mean()
-                results['avg_return_per_signal'] = abs(predicted_returns[valid_predictions]).mean()
+                position = position_size
+                entry_price = current_price
+                capital -= commission_paid
 
-        print(f"📈 回测结果:")
-        print(f"  总信号数: {results['total_signals']}")
-        print(f"  买入信号: {results['buy_signals']}")
-        print(f"  卖出信号: {results['sell_signals']}")
-        print(f"  强信号数: {results['strong_signals']}")
-        print(f"  胜率: {results['win_rate']:.2%}")
-        print(f"  平均预期收益: {results['avg_return_per_signal']:.4%}")
+                results['trades'].append({
+                    'timestamp': idx,
+                    'type': 'BUY',
+                    'price': current_price,
+                    'size': position_size,
+                    'commission': commission_paid
+                })
 
+            elif row['trading_signal'].startswith('STRONG_SELL') and position > 0:
+                # 平仓
+                exit_value = position * current_price
+                commission_paid = exit_value * self.commission
+                pnl = exit_value - (position * entry_price) - commission_paid
+
+                capital += exit_value - commission_paid
+
+                results['trades'].append({
+                    'timestamp': idx,
+                    'type': 'SELL',
+                    'price': current_price,
+                    'size': position,
+                    'pnl': pnl,
+                    'return': pnl / (position * entry_price)
+                })
+
+                position = 0
+
+            # 记录权益曲线
+            current_value = capital + position * current_price
+            results['equity_curve'].append({
+                'timestamp': idx,
+                'capital': capital,
+                'position_value': position * current_price,
+                'total_value': current_value
+            })
+
+        # 计算性能指标
+        results['metrics'] = self._calculate_metrics(results)
         return results
 
+    def _calculate_metrics(self, results):
+        """计算回测指标"""
+        equity_curve = pd.DataFrame(results['equity_curve'])
+        trades = pd.DataFrame(results['trades'])
 
+        # 计算收益率
+        total_return = (equity_curve['total_value'].iloc[-1] /
+                        self.initial_capital - 1)
+
+        # 计算夏普比率
+        returns = equity_curve['total_value'].pct_change().dropna()
+        sharpe = returns.mean() / returns.std() * np.sqrt(252)
+
+        # 计算最大回撤
+        cummax = equity_curve['total_value'].cummax()
+        drawdown = (equity_curve['total_value'] - cummax) / cummax
+        max_drawdown = drawdown.min()
+
+        # 胜率
+        winning_trades = trades[trades['pnl'] > 0] if 'pnl' in trades else pd.DataFrame()
+        win_rate = len(winning_trades) / len(trades) if len(trades) > 0 else 0
+
+
+
+        backtest_result = {
+            'total_return': total_return,
+            'sharpe_ratio': sharpe,
+            'max_drawdown': max_drawdown,
+            'win_rate': win_rate,
+            'total_trades': len(trades),
+            'avg_trade_return': trades['return'].mean() if 'return' in trades else 0
+        }
+
+        logBot.info(backtest_result)
