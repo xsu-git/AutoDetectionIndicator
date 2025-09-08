@@ -57,20 +57,31 @@ class PeakStructureFeature(ExtractFeatureBase):
         - 事件点：0
         - 事件之后：递增 1,2,3...
         """
-        n = len(condition_series)
-        idx = condition_series.index
-        # 将 NaN 当作 False（若你需要保持 NaN 特殊含义，可自行调整）
-        ev = condition_series.fillna(False).to_numpy(dtype=bool)
+        # n = len(condition_series)
+        # idx = condition_series.index
+        # # 将 NaN 当作 False（若你需要保持 NaN 特殊含义，可自行调整）
+        # ev = condition_series.fillna(False).to_numpy(dtype=bool)
+        #
+        # ar = np.arange(n, dtype=np.int64)
+        # # 把事件位置设为自身索引，否则为 -1；再做前缀最大值，得到“最近一次事件的索引”
+        # last_idx = np.where(ev, ar, -1)
+        # last_idx = np.maximum.accumulate(last_idx)
+        #
+        # out = np.full(n, np.nan, dtype=float)
+        # m = last_idx != -1
+        # out[m] = ar[m] - last_idx[m]
+        # return pd.Series(out, index=idx, dtype=float)
+        result = pd.Series(np.nan, index=condition_series.index)
+        last_event_idx = np.nan
 
-        ar = np.arange(n, dtype=np.int64)
-        # 把事件位置设为自身索引，否则为 -1；再做前缀最大值，得到“最近一次事件的索引”
-        last_idx = np.where(ev, ar, -1)
-        last_idx = np.maximum.accumulate(last_idx)
+        for i in range(len(condition_series)):
+            if condition_series.iloc[i]:
+                last_event_idx = i
+                result.iloc[i] = 0
+            elif not np.isnan(last_event_idx):
+                result.iloc[i] = i - last_event_idx
 
-        out = np.full(n, np.nan, dtype=float)
-        m = last_idx != -1
-        out[m] = ar[m] - last_idx[m]
-        return pd.Series(out, index=idx, dtype=float)
+        return result
 
     def _price_distance_to_last_peak(self, df_tech, peak_type):
         """
