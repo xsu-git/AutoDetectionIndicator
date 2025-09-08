@@ -488,7 +488,7 @@ class PeakDetector:
             f.write(json.dumps(content, ensure_ascii=False, indent=2,default=to_jsonable, allow_nan=False))
 
 if __name__ == '__main__':
-    df = load_process_data("BTC_USDT_USDT-5m-futures.csv")
+    df = load_process_data("origin_data.csv")
     detector = PeakDetector(
         atr_period=14,  # ATR周期
         volatility_window=20,  # 波动率窗口

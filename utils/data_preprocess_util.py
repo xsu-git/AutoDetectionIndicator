@@ -91,5 +91,4 @@ def calculate_technical_base(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    feather_to_csv("BTC_USDT_USDT-5m-futures.feather")
-    # load_process_data("BTC_USDT_USDT-5m-futures.csv")
+    feather_to_csv("origin_data.feather")
