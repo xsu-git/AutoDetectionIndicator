@@ -103,12 +103,12 @@ class EnhancedBacktester:
             if signal != 'NO_SIGNAL' and len(self.positions) < self.max_positions:
                 position_size = row.get('position_size', 0.1)
 
-                if 'BUY' in signal:
+                if 'STRONG_BUY' in signal:
                     self._open_long_position(
                         idx, current_price, position_size,
                         available_capital, signal, row, results
                     )
-                elif 'SELL' in signal:
+                elif 'STRONG_SELL' in signal:
                     self._open_short_position(
                         idx, current_price, position_size,
                         available_capital, signal, row, results

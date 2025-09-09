@@ -5,6 +5,7 @@
 ---------------    -------    --------    -----------
 2025/9/9 11:16     Xsu         1.0         None
 '''
+import json
 
 # !/usr/bin/env python
 # -*- coding: utf-8 -*-
@@ -24,6 +25,7 @@ from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
 from sklearn.preprocessing import RobustScaler
 import warnings
+from utils import logBot
 
 warnings.filterwarnings('ignore')
 
@@ -92,7 +94,7 @@ class OptimizedTradingSystem:
         )
 
         backtest_results = self.backtester.backtest(signals_df, self.df_tech)
-
+        logBot.info(json.dumps(backtest_results))
         # 8. 输出结果
         self._print_results(backtest_results)
 
