@@ -75,7 +75,7 @@ class OptimizedTradingSystem:
 
         # 5. 生成交易信号
         print("\n📡 生成交易信号...")
-        signals_df = self.signal_generator.generate_trading_signals_enhanced(
+        signals_df = self.signal_generator.generate_trading_signals(
             self.df_tech, self.features_df
         )
 
@@ -88,7 +88,7 @@ class OptimizedTradingSystem:
             initial_capital=100000,
             commission=0.001,
             slippage=0.0005,
-            max_positions=3
+            max_positions=5
         )
 
         backtest_results = self.backtester.backtest(signals_df, self.df_tech)
